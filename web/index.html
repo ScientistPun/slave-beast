@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CEO 聊天室</title>
+  <title>奴隶兽团队 - 多Agent调度系统</title>
   <style>
     * {
       margin: 0;
@@ -11,547 +11,575 @@
       box-sizing: border-box;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f7fa;
-      height: 100vh;
-      margin: 0;
-      overflow: hidden;
+    :root {
+      --theme-primary: #6366F1;
+      --theme-primary-dark: #4F46E5;
+      --theme-primary-light: #818CF8;
+
+      --agent-ceo: #EF4444;
+      --agent-cto: #F59E0B;
+      --agent-cro: #10B981;
+      --agent-coo: #3B82F6;
+      --agent-pm: #8B5CF6;
+      --agent-qd: #EC4899;
+
+      --status-success: #22C55E;
+      --status-warning: #F59E0B;
+      --status-error: #EF4444;
+
+      --bg-main: #F3F4F6;
+      --bg-card: #FFFFFF;
+      --bg-header: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+      --bg-input: #F9FAFB;
+      --bg-hover: #F3F4F6;
+      --bg-chat: #E8EAF6;
+
+      --text-primary: #1F2937;
+      --text-secondary: #6B7280;
+      --text-light: #9CA3AF;
+
+      --border: #E5E7EB;
+      --bubble-user: #4F46E5;
+      --bubble-agent: #FFFFFF;
     }
 
-    .chat-container {
-      width: 100%;
-      height: 100%;
-      background: #fff;
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    /* 左侧：聊天区域 */
+    .chat-section {
+      flex: 1;
       display: flex;
       flex-direction: column;
+      background: var(--bg-card);
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       overflow: hidden;
     }
 
+    /* 头部 */
     .chat-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px 24px;
+      background: var(--bg-header);
       color: white;
-      padding: 16px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .header-left {
+    .chat-header-left {
       display: flex;
-      align-items: center;
-      gap: 16px;
+      flex-direction: column;
     }
 
     .chat-header h1 {
-      font-size: 20px;
+      font-size: 1.35rem;
       font-weight: 600;
-      margin: 0;
     }
 
     .chat-header p {
-      font-size: 14px;
+      font-size: 0.85rem;
       opacity: 0.9;
     }
 
-    .agent-status {
-      display: flex;
+    .connection-status {
+      display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 12px;
-      transition: background 0.2s;
+      font-size: 0.75rem;
+      padding: 4px 12px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
     }
 
-    .agent-status:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .status-dot {
+    .connection-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      transition: background 0.3s;
+      background: rgba(255,255,255,0.5);
     }
 
-    .status-dot.online {
-      background: #4ade80;
-      box-shadow: 0 0 6px #4ade80;
+    .connection-dot.connected {
+      background: #4ADE80;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
     }
 
-    .status-dot.offline {
-      background: #9ca3af;
-    }
-
-    .status-dot.connecting {
-      background: #fbbf24;
-      animation: pulse 1s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
+    /* 消息区域 */
     .chat-messages {
       flex: 1;
       overflow-y: auto;
       padding: 20px;
-      background: #f5f7fa;
-    }
-
-    #loadHistoryBtn {
-      background: #f1f1f1;
-      color: #d1d1d1;
-      margin-bottom: 16px;
-    }
-
-    #loadHistoryBtn:hover {
-      background: #f1f1f1;
-      color: #d0d0d0;
-    }
-
-    .message {
-      margin-bottom: 16px;
+      background: var(--bg-chat);
       display: flex;
-      align-items: flex-end;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .message.user {
+    /* ====== 消息样式 ====== */
+
+    /* 消息行 - 外层容器 */
+    .message-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    /* 用户消息：靠右，头像在右 */
+    .message-row.user {
       flex-direction: row-reverse;
     }
 
-    .message.ceo {
-      flex-direction: row;
-    }
-
-    .message-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      object-fit: cover;
-      flex-shrink: 0;
-      display: block;
-    }
-
-    .message.user .message-avatar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-
-    .message-name {
-      font-size: 12px;
-      color: #667eea;
-      font-weight: 500;
-      margin-bottom: 4px;
-    }
-
-    .message-bubble-wrapper {
+    /* 头像容器 */
+    .avatar-wrapper {
       display: flex;
       flex-direction: column;
-      margin: 0 8px;
-      flex: 1;
+      align-items: center;
+      flex-shrink: 0;
     }
 
-    .message.user .message-bubble-wrapper {
+    /* 用户消息：用户名在头像下方 */
+    .message-row.user .avatar-wrapper {
       align-items: flex-end;
     }
 
-    .message.ceo .message-bubble-wrapper {
-      align-items: flex-start;
+    /* 头像 */
+    .message-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
     }
 
-    .message-content {
-      max-width: 80%;
-      padding: 12px 16px;
+    /* 消息容器 - 内层 */
+    .message {
+      display: flex;
+      flex-direction: column;
+      max-width: 70%;
+      min-width: 80px;
+    }
+
+    /* 发送者名称 - 放在气泡上方 */
+    .message .sender {
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      padding: 0 4px;
+    }
+
+    /* 用户消息：发送者名称靠右 */
+    .message-row.user .sender {
+      text-align: right;
+    }
+
+    /* 各角色颜色 */
+    .sender[data-role="ceo"] { color: var(--agent-ceo); }
+    .sender[data-role="cto"] { color: var(--agent-cto); }
+    .sender[data-role="cro"] { color: var(--agent-cro); }
+    .sender[data-role="coo"] { color: var(--agent-coo); }
+    .sender[data-role="pm"] { color: var(--agent-pm); }
+    .sender[data-role="qd"] { color: var(--agent-qd); }
+
+    /* 用户消息发送者 */
+    .message-row.user .sender {
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    /* 气泡 */
+    .message-bubble {
+      padding: 10px 14px;
       border-radius: 16px;
       line-height: 1.5;
-      font-size: 13px;
-      white-space: pre-wrap;
-      word-break: break-word;
+      font-size: 0.9rem;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     }
 
-    .message.user .message-content {
-      background: #667eea;
+    /* Agent 气泡 - 白色 */
+    .message-row.agent .message-bubble {
+      background: var(--bubble-agent);
+      border: 1px solid var(--border);
+      border-top-left-radius: 4px;
+    }
+
+    /* 用户气泡 - 主题色 */
+    .message-row.user .message-bubble {
+      background: var(--bubble-user);
       color: white;
-      border-bottom-right-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border-top-right-radius: 4px;
     }
 
-    .message.ceo .message-content {
-      background: white;
-      color: #333;
-      border-bottom-left-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    /* 消息内容 */
+    .message .content {
+      word-break: break-word;
+      white-space: pre-wrap;
     }
 
-    .message-time {
-      font-size: 11px;
-      color: #999;
+    /* 时间戳 */
+    .message .time {
+      font-size: 0.6rem;
+      color: var(--text-light);
       margin-top: 4px;
-      padding: 0 8px;
+      padding: 0 4px;
     }
 
-    .typing-indicator {
-      display: none;
-      padding: 12px 16px;
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      margin-bottom: 16px;
-      width: fit-content;
+    .message-row.user .time {
+      color: rgba(255, 255, 255, 0.7);
+      text-align: right;
     }
 
-    .typing-indicator.active {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* 系统消息 */
+    .message-row.system {
+      justify-content: center;
     }
 
-    .typing-dots {
-      display: flex;
-      gap: 4px;
+    .message-row.system .message-bubble {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 8px 16px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-align: center;
     }
 
-    .typing-dots span {
-      width: 8px;
-      height: 8px;
-      background: #999;
-      border-radius: 50%;
-      animation: typing 1.4s infinite;
-    }
-
-    .typing-dots span:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-
-    .typing-dots span:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-
-    @keyframes typing {
-      0%, 60%, 100% {
-        transform: translateY(0);
-        opacity: 0.4;
-      }
-      30% {
-        transform: translateY(-4px);
-        opacity: 1;
-      }
-    }
-
+    /* 输入区域 */
     .chat-input-area {
-      padding: 20px;
-      background: white;
-      border-top: 1px solid #eee;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
     }
 
     .chat-input-wrapper {
       display: flex;
       gap: 12px;
+      align-items: center;
     }
 
     .chat-input {
       flex: 1;
-      padding: 14px 18px;
-      border: 2px solid #e1e1e1;
+      padding: 14px 20px;
+      border: 2px solid var(--border);
       border-radius: 25px;
-      font-size: 16px;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 0.95rem;
       outline: none;
-      transition: border-color 0.3s;
+      transition: all 0.2s;
     }
 
     .chat-input:focus {
-      border-color: #667eea;
+      border-color: var(--theme-primary);
+      background: white;
     }
 
-    .send-button {
-      padding: 14px 28px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+    .chat-input::placeholder {
+      color: var(--text-light);
+    }
+
+    .send-btn {
+      width: 50px;
+      height: 50px;
       border: none;
-      border-radius: 25px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .send-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-    }
-
-    .send-button:active {
-      transform: translateY(0);
-    }
-
-    .send-button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .action-btn {
-      padding: 8px 16px;
-      background: rgba(255, 255, 255, 0.2);
-      border: none;
-      border-radius: 15px;
-      font-size: 13px;
+      border-radius: 50%;
+      background: var(--theme-primary);
       color: white;
+      font-size: 1.2rem;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
     }
 
-    .action-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
+    .send-btn:hover {
+      background: var(--theme-primary-dark);
+      transform: scale(1.05);
     }
 
-    .online-notification {
-      text-align: center;
-      padding: 8px 16px;
-      margin: 10px auto;
-      background: #e8f5e9;
-      color: #2e7d32;
+    .send-btn:active {
+      transform: scale(0.95);
+    }
+
+    .at-hint {
+      font-size: 0.75rem;
+      color: var(--text-light);
+      margin-top: 10px;
+      padding-left: 8px;
+    }
+
+    /* 右侧：看板 */
+    .kanban-section {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .kanban-card {
+      background: var(--bg-card);
       border-radius: 20px;
-      font-size: 13px;
-      width: fit-content;
-      animation: fadeIn 0.3s ease;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
+    .kanban-card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border);
+      color: var(--text-primary);
+    }
+
+    /* Agent 列表 */
+    .agent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .agent-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      background: var(--bg-input);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .agent-item:hover {
+      background: white;
+      box-shadow: 0 2px 12px rgba(99, 102, 241, 0.15);
+    }
+
+    /* Agent 头像 */
+    .agent-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    /* Agent 未上线状态 - 灰色头衔 */
+    .agent-item.offline .agent-name {
+      color: var(--text-light);
+    }
+
+    .agent-item.offline .agent-avatar {
+      opacity: 0.5;
+      filter: grayscale(100%);
+    }
+
+    .agent-item.offline .status-badge {
+      background: rgba(156, 163, 175, 0.15);
+      color: var(--text-light);
+    }
+
+    .agent-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .agent-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 2px;
+      color: var(--text-primary);
+    }
+
+    .agent-task {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .agent-status {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-badge.idle {
+      background: rgba(34, 197, 94, 0.15);
+      color: #16A34A;
+    }
+
+    .status-badge.processing,
+    .status-badge.busy {
+      background: rgba(245, 158, 11, 0.15);
+      color: #D97706;
+    }
+
+    .status-badge.finish {
+      background: rgba(34, 197, 94, 0.15);
+      color: #16A34A;
+    }
+
+    .status-badge.reject {
+      background: rgba(239, 68, 68, 0.15);
+      color: #DC2626;
+    }
+
+    .status-badge.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: #DC2626;
+    }
+
+    .status-badge.queued {
+      background: rgba(59, 130, 246, 0.15);
+      color: #2563EB;
+    }
+
+    .queue-count {
+      font-size: 0.7rem;
+      color: var(--text-light);
+    }
+
+    /* 按钮组 */
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .history-btn {
+      padding: 14px 18px;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: none;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .history-btn:hover {
+      background: var(--theme-primary);
+      color: white;
+    }
+
+    .history-btn.danger {
+      border: 2px solid #FEE2E2;
+      color: var(--status-error);
+    }
+
+    .history-btn.danger:hover {
+      background: var(--status-error);
+      color: white;
+      border-color: var(--status-error);
+    }
+
+    /* 响应式 */
+    @media (max-width: 1024px) {
+      .container {
+        flex-direction: column;
+        padding: 10px;
+      }
+
+      .kanban-section {
+        width: 100%;
+      }
+
+      .message {
+        max-width: 80%;
+      }
+    }
+
+    /* 滚动条 */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
     }
   </style>
 </head>
 <body>
-  <div class="chat-container">
-    <div class="chat-header">
-      <div class="header-left">
-        <h1>包工头洽谈室</h1>
-        <div class="agent-status" id="agentStatus">
-          <span class="status-dot offline"></span>
-          <span class="status-text">连接中...</span>
+  <div class="container">
+    <!-- 左侧聊天区域 -->
+    <div class="chat-section">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <h1>奴隶兽团队</h1>
+          <p>多Agent智能任务调度系统</p>
+        </div>
+        <div class="connection-status">
+          <span class="connection-dot" id="connectionDot"></span>
+          <span id="connectionText">连接中...</span>
         </div>
       </div>
-      <button class="action-btn" id="clearBtn">清空对话</button>
-    </div>
 
-    <div class="chat-messages" id="chatMessages">
-      <a class="action-btn" id="loadHistoryBtn">点击获取对话历史</a>
-      <div class="typing-indicator" id="typingIndicator">
-        <div class="typing-dots">
-          <span></span>
-          <span></span>
-          <span></span>
+      <div class="chat-messages" id="chatMessages"></div>
+
+      <div class="chat-input-area">
+        <div class="chat-input-wrapper">
+          <input
+            type="text"
+            class="chat-input"
+            id="chatInput"
+            placeholder="输入消息或@某个Agent分配任务..."
+            autocomplete="off"
+          >
+          <button class="send-btn" id="sendBtn">➤</button>
         </div>
-        <span>Typing</span>
+        <div class="at-hint">提示：@包工头 @桥王 @天文台 @蛇头 @驴仔 @忍者神龟 可单独分配任务</div>
       </div>
     </div>
 
-    <div class="chat-input-area">
-      <div class="chat-input-wrapper">
-        <input
-          type="text"
-          class="chat-input"
-          id="messageInput"
-          placeholder="输入消息..."
-          autocomplete="off"
-        />
-        <button class="send-button" id="sendButton">发送</button>
+    <!-- 右侧看板区域 -->
+    <div class="kanban-section">
+      <div class="kanban-card">
+        <h2>Agent 状态</h2>
+        <div class="agent-list" id="agentList"></div>
+      </div>
+
+      <div class="kanban-card">
+        <h2>操作</h2>
+        <div class="btn-group">
+          <button class="history-btn" id="loadHistoryBtn">📜 加载历史记录</button>
+          <button class="history-btn danger" id="clearHistoryBtn">🗑️ 清空聊天记录</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <script>
-    const WS_PORT = 3000;
-    const ws = new WebSocket(`ws://localhost:${WS_PORT}`);
-    const chatMessages = document.getElementById('chatMessages');
-    const messageInput = document.getElementById('messageInput');
-    const sendButton = document.getElementById('sendButton');
-    const typingIndicator = document.getElementById('typingIndicator');
-    const clearBtn = document.getElementById('clearBtn');
-    const loadHistoryBtn = document.getElementById('loadHistoryBtn');
-    const agentStatus = document.getElementById('agentStatus');
-
-    const sessionId = localStorage.getItem('ceo_session') || 'user_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('ceo_session', sessionId);
-
-    // 用于追踪已发送的消息ID（用于去重服务器广播回来的自己的消息）
-    const sentMessageIds = new Set();
-
-    // 生成唯一消息ID
-    function generateMessageId() {
-      return 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    }
-
-    // 更新Agent状态显示
-    function updateAgentStatus(status, text) {
-      const dot = agentStatus.querySelector('.status-dot');
-      const textEl = agentStatus.querySelector('.status-text');
-      dot.className = 'status-dot ' + status;
-      textEl.textContent = text;
-    }
-
-    // WebSocket事件
-    ws.onopen = () => {
-      updateAgentStatus('online', '在线');
-      loadHistory();
-    };
-
-    ws.onclose = () => {
-      updateAgentStatus('offline', '离线');
-    };
-
-    ws.onerror = () => {
-      updateAgentStatus('offline', '连接失败');
-    };
-
-    // 点击状态指示器重连
-    agentStatus.addEventListener('click', () => {
-      if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-        updateAgentStatus('connecting', '重连中...');
-        ws.close();
-        setTimeout(() => {
-          location.reload();
-        }, 500);
-      }
-    });
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      typingIndicator.classList.remove('active');
-
-      if (data.type === 'response') {
-        addMessage('ceo', data.content, data.timestamp);
-        // CEO回复后确保状态是在线
-        updateAgentStatus('online', '在线');
-      }
-
-      if (data.type === 'user_message') {
-        // 跳过已发送的消息（服务器广播回来的自己的消息）
-        if (!sentMessageIds.has(data.messageId)) {
-          addMessage('user', data.content, data.timestamp);
-        } else {
-          sentMessageIds.delete(data.messageId);
-        }
-      }
-
-      if (data.type === 'online') {
-        updateAgentStatus('online', '在线');
-      }
-
-      if (data.type === 'history' && data.messages) {
-        chatMessages.querySelectorAll('.message').forEach(el => el.remove());
-        // 清空已发送消息追踪
-        sentMessageIds.clear();
-        // 服务器返回最新在前，遍历添加到 typingIndicator 前
-        // 结果： oldest ... newest (正确顺序)
-        data.messages.forEach(msg => {
-          addMessage(msg.role, msg.content, msg.timestamp, false);
-        });
-      }
-
-      if (data.type === 'clear') {
-        chatMessages.querySelectorAll('.message').forEach(el => el.remove());
-        sentMessageIds.clear();
-      }
-    };
-
-    // 添加消息到界面
-    function addMessage(role, content, timestamp) {
-      const messageDiv = document.createElement('div');
-      // 映射 agent_ceo -> ceo
-      const displayRole = role === 'agent_ceo' ? 'ceo' : role;
-      messageDiv.className = `message ${displayRole}`;
-
-      const time = timestamp ? new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
-
-      // 头像HTML
-      let avatarHtml = '';
-      if (displayRole === 'ceo') {
-        avatarHtml = `<img class="message-avatar" src="/face/ceo.png" alt="CEO">`;
-      } else {
-        avatarHtml = `<img class="message-avatar" src="/face/boss.png" alt="Boss">`;
-      }
-
-      // CEO名字在头像下方，用户消息不显示名字
-      const nameHtml = displayRole === 'ceo' ? `<span class="message-name">包工头</span>` : '';
-
-      messageDiv.innerHTML = `
-        <div class="message-from">
-        ${avatarHtml}
-        ${nameHtml}
-        </div>
-        <div class="message-bubble-wrapper">
-          <div class="message-content">${escapeHtml(content)}</div>
-          ${time ? `<div class="message-time">${time}</div>` : ''}
-        </div>
-      `;
-
-      // 插入到 typing indicator 之前
-      chatMessages.insertBefore(messageDiv, typingIndicator);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    // HTML转义
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // 发送消息
-    function sendMessage() {
-      const content = messageInput.value.trim();
-      if (!content) return;
-
-      const messageId = generateMessageId();
-      const timestamp = new Date().toISOString();
-
-      messageInput.value = '';
-
-      // 立即本地显示用户消息
-      addMessage('user', content, timestamp);
-      // 标记该消息已发送，服务器广播回来时跳过
-      sentMessageIds.add(messageId);
-      typingIndicator.classList.add('active');
-
-      ws.send(JSON.stringify({
-        type: 'chat',
-        content,
-        sessionId,
-        messageId
-      }));
-    }
-
-    // 加载历史
-    function loadHistory() {
-      ws.send(JSON.stringify({
-        type: 'history',
-        sessionId
-      }));
-    }
-
-    // 清空对话
-    function clearChat() {
-      if (confirm('确定要清空所有对话记录吗？')) {
-        ws.send(JSON.stringify({
-          type: 'clear',
-          sessionId
-        }));
-      }
-    }
-
-    // 事件绑定
-    sendButton.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') sendMessage();
-    });
-    clearBtn.addEventListener('click', clearChat);
-    loadHistoryBtn.addEventListener('click', loadHistory);
-  </script>
+  <script src="index.js"></script>
 </body>
 </html>

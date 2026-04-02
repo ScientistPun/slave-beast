@@ -1,272 +1,479 @@
-import { WebSocketServer } from 'ws';
-import { createClient } from 'redis';
-import Anthropic from '@anthropic-ai/sdk';
-import * as dotenv from 'dotenv';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+/**
+ * WebSocket 服务器
+ * 负责：接收客户端消息、路由到 Agent、任务排队（Redis）、广播 Agent 回复
+ */
 
-dotenv.config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const { WebSocketServer } = require('ws');
+const http = require('http');
+const express = require('express');
+const path = require('path');
+const { systemLogger: logger } = require('./utils/logger');
+const {
+  KEYS,
+  initRedis,
+  addChatMessage,
+  getChatHistory,
+  clearChatHistory,
+  setAgentOnline,
+  setAgentOffline,
+  getOnlineAgents,
+  isAgentOnline,
+  setAgentStatus,
+  getAgentStatus,
+  getAllAgentStatus,
+  addToQueue,
+  popFromQueue,
+  getQueueLength,
+  publish,
+  subscribe
+} = require('./utils/redis');
 
-// 加载CEO agent配置
-const ceoConfig = readFileSync(join(__dirname, '/agents/ceo.md'), 'utf-8');
+// WebSocket 连接存储
+const agents = new Map(); // role -> ws
+const clients = new Map(); // clientId -> ws
 
-// 初始化Anthropic客户端
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  baseURL: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
-});
+/**
+ * 创建 HTTP + WebSocket 服务器
+ */
+async function main() {
+  logger.info('===========================================');
+  logger.info('  slave-beasts 多Agent调度系统启动中...');
+  logger.info('===========================================');
 
-// Redis客户端
-const redis = createClient({
-  url: `redis://${process.env.REDIS_PASSWORD ? ':' + process.env.REDIS_PASSWORD + '@' : ''}${process.env.REDIS_HOST || '127.0.0.1'}:${process.env.REDIS_PORT || 6379}`,
-});
+  // 初始化 Redis
+  await initRedis();
 
-redis.on('error', (err) => console.log('Redis Client Error', err));
+  const app = express();
+  app.use(express.static(path.join(__dirname, 'web')));
 
-const WEB_PORT = parseInt(process.env.PORT) || 3100
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server });
 
-// WebSocket服务器
-const wss = new WebSocketServer({ port: WEB_PORT });
+  // 处理 WebSocket 连接
+  wss.on('connection', (ws) => {
+    const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    clients.set(clientId, ws);
 
-// 聊天记录存储在Redis的Key前缀
-const CHATROOM_KEY = 'slaves:chatroom:';
-const SESSION_KEY = 'slaves:chatroom_session:';
+    logger.info(`客户端连接: ${clientId}`);
 
-// 存储所有连接的客户端
-const clients = new Set();
+    // 发送欢迎消息
+    ws.send(JSON.stringify({
+      type: 'system',
+      content: '欢迎来到奴隶兽团队！有什么需要帮忙的？',
+      timestamp: Date.now()
+    }));
 
-// 广播消息给所有客户端
-function broadcast(data, exclude = null) {
-  const message = JSON.stringify(data);
-  clients.forEach((client) => {
-    if (client !== exclude && client.readyState === 1) {
-      client.send(message);
+    // 发送聊天历史
+    sendChatHistory(ws);
+
+    ws.on('message', (data) => {
+      const message = JSON.parse(data.toString());
+      if (message.type === 'agent_register' || message.type === 'agent_reply' || message.type === 'assign_task' || message.type === 'task_result' || message.type === 'task_complete') {
+        handleAgentMessage(ws, message);
+      } else {
+        handleClientMessage(clientId, ws, message);
+      }
+    });
+
+    ws.on('close', () => {
+      clients.delete(clientId);
+      logger.info(`客户端断开: ${clientId}`);
+    });
+  });
+
+  // 订阅 Agent 状态更新
+  await subscribe(KEYS.CHANNEL('agent_updates'), (update) => {
+    broadcast({ type: 'agent_update', data: update, timestamp: Date.now() });
+  });
+
+  // 订阅聊天广播
+  await subscribe(KEYS.CHANNEL('broadcast'), (message) => {
+    broadcast(message);
+  });
+
+  // 定期广播 Agent 状态
+  setInterval(async () => {
+    try {
+      const status = await getAllAgentStatus();
+      broadcast({ type: 'agent_status', data: status, timestamp: Date.now() });
+    } catch (err) {
+      logger.error('广播状态失败', { error: err.message });
     }
+  }, 5000);
+
+  const PORT = process.env.PORT || 8080;
+  server.listen(PORT, () => {
+    logger.info(`服务器已启动，端口: ${PORT}`);
+    logger.info('等待 Agent 连接...');
   });
 }
 
-// 初始化
-async function init() {
-  await redis.connect();
-  console.log('已连接Redis');
-  console.log('包工头洽谈室已启动，监听端口 ' + WEB_PORT);
+/**
+ * 发送聊天历史给客户端
+ */
+async function sendChatHistory(ws) {
+  try {
+    const history = await getChatHistory(100);
+    ws.send(JSON.stringify({ type: 'chat_history', data: history, timestamp: Date.now() }));
+  } catch (err) {
+    logger.error('发送聊天历史失败', { error: err.message });
+  }
 }
 
-// 处理WebSocket消息
-async function handleMessage(ws, message) {
-  console.log('[WS收到消息]:', message.toString());
-  try {
-    const data = JSON.parse(message);
-    const { type, content, sessionId, messageId } = data;
+/**
+ * 处理客户端消息
+ */
+async function handleClientMessage(clientId, _ws, message) {
+  const { type, content } = message;
 
-    if (type === 'chat') {
-      console.log('[收到老细信息]:', content);
-      const userId = 'boss';
-      const timestamp = new Date().toISOString();
+  if (type === 'chat' && content) {
+    // 保存到 Redis
+    await addChatMessage({ type: 'user', from: '老细', content });
 
-      // 1. 保存用户消息到Redis
-      await saveMessage(userId, {
-        role: 'user',
-        content,
-        timestamp,
-      });
+    // 通过频道广播（subscribe 会转发给所有客户端）
+    await publish(KEYS.CHANNEL('broadcast'), {
+      type: 'chat',
+      from: '老细',
+      content,
+      timestamp: Date.now()
+    });
 
-      // 1.5 广播用户消息给所有其他客户端（包括发送者用于去重）
-      broadcast({
+    // 转发给 CEO 处理
+    const ceoWs = agents.get('ceo');
+    if (ceoWs && ceoWs.readyState === 1) {
+      ceoWs.send(JSON.stringify({
         type: 'user_message',
         content,
-        timestamp,
+        userId: clientId
+      }));
+    } else {
+      _ws.send(JSON.stringify({
+        type: 'system',
+        content: '包工头暂未上线，请稍后再试...',
+        timestamp: Date.now()
+      }));
+    }
+  }
+
+  if (type === 'get_history') {
+    const history = await getChatHistory(100);
+    _ws.send(JSON.stringify({
+      type: 'chat_history',
+      data: history,
+      timestamp: Date.now()
+    }));
+  }
+
+  if (type === 'clear_history') {
+    await clearChatHistory();
+    broadcast({ type: 'history_cleared', timestamp: Date.now() });
+  }
+}
+
+/**
+ * 处理 Agent 消息
+ */
+async function handleAgentMessage(ws, message) {
+  const { type } = message;
+
+  if (type === 'agent_register') {
+    await handleAgentRegister(ws, message);
+    return;
+  }
+
+  if (type === 'agent_reply') {
+    await handleAgentReply(message);
+    return;
+  }
+
+  if (type === 'assign_task') {
+    await handleAssignTask(message);
+    return;
+  }
+
+  if (type === 'task_result') {
+    await handleTaskResult(message);
+    return;
+  }
+
+  if (type === 'task_complete') {
+    await handleTaskComplete(message);
+    return;
+  }
+}
+
+/**
+ * Agent 注册
+ */
+async function handleAgentRegister(ws, message) {
+  const { role, name } = message;
+
+  agents.set(role, ws);
+
+  // 设置在线状态到 Redis
+  await setAgentOnline(role, name);
+
+  // 初始化 Redis 状态
+  await setAgentStatus(role, {
+    status: 'idle',
+    name,
+    currentTask: null,
+    queueLength: await getQueueLength(role)
+  });
+
+  logger.info(`Agent 注册: ${name} (${role})`);
+
+  // 监听断开连接
+  ws.on('close', async () => {
+    agents.delete(role);
+    await setAgentOffline(role);
+    logger.info(`Agent 断开: ${name} (${role})`);
+    broadcastAgentStatus(role);
+  });
+
+  // 广播状态更新
+  broadcastAgentStatus(role);
+}
+
+/**
+ * Agent 回复
+ */
+async function handleAgentReply(message) {
+  const { from, content } = message;
+
+  // 保存到 Redis
+  await addChatMessage({ type: 'agent', from, content });
+
+  // 通过频道广播（subscribe 会转发给所有客户端）
+  await publish(KEYS.CHANNEL('broadcast'), {
+    type: 'chat',
+    from,
+    content,
+    timestamp: Date.now()
+  });
+}
+
+/**
+ * 处理任务分配
+ */
+async function handleAssignTask(message) {
+  const { from, to, taskContent, userId, flow } = message;
+
+  const targetBusy = await isAgentBusy(to);
+
+  if (targetBusy) {
+    // Agent 忙碌，加入 Redis 队列
+    await addToQueue(to, { taskContent, userId, flow, from, addedAt: Date.now() });
+
+    // 更新队列长度（状态保持 processing 表示正在执行）
+    await setAgentStatus(to, {
+      status: 'processing',
+      queueLength: await getQueueLength(to)
+    });
+
+    logger.info(`${to} 忙碌，任务入队，当前队列: ${await getQueueLength(to)}`);
+
+    // 通知请求者
+    notifyTaskQueued(from, to, await getQueueLength(to));
+  } else {
+    // Agent 空闲，发送任务
+    const targetWs = agents.get(to);
+    if (targetWs && targetWs.readyState === 1) {
+      // 更新状态为 processing
+      await setAgentStatus(to, {
+        status: 'processing',
+        name: from,
+        currentTask: taskContent,
+        queueLength: await getQueueLength(to)
+      });
+
+      targetWs.send(JSON.stringify({
+        type: 'new_task',
+        taskContent,
         userId,
-        messageId,  // 用于客户端去重
-      });
+        flow
+      }));
 
-      // 2. 获取聊天历史
-      const history = await getChatHistory(userId);
-      console.log('[历史消息数]:', history.length);
+      logger.info(`任务发送给 ${to}`);
 
-      // 3. 调用Claude API
-      console.log('[开始调用Claude API]');
-      const response = await getClaudeResponse(history, content);
-      console.log('[Claude返回]:', response);
-
-      // 4. 保存CEO回复到Redis
-      await saveMessage(userId, {
-        role: 'agent_ceo',
-        content: response,
-        timestamp: new Date().toISOString(),
-      });
-
-      // 5. 打印CEO回复
-      console.log(`[包工头回复] ${response}`);
-
-      // 5. 广播CEO回复给所有客户端
-      broadcast({
-        type: 'response',
-        content: response,
-        timestamp: new Date().toISOString(),
-      });
+      broadcastAgentStatus(to);
+    } else {
+      // Agent 不在线，加入队列等待
+      await addToQueue(to, { taskContent, userId, flow, from, addedAt: Date.now() });
+      logger.info(`${to} 不在线，任务入队`);
     }
+  }
+}
 
-    if (type === 'history') {
-      const userId = 'boss';
-      const history = await getChatHistory(userId);
-      ws.send(JSON.stringify({
-        type: 'history',
-        messages: history,
+/**
+ * 任务结果（审核驳回）
+ */
+async function handleTaskResult(message) {
+  const { from, status, review, taskContent, userId } = message;
+
+  // status: 'approved' | 'reject'
+
+  if (status === 'reject') {
+    // 驳回，通知 CEO
+    const ceoWs = agents.get('ceo');
+    if (ceoWs && ceoWs.readyState === 1) {
+      ceoWs.send(JSON.stringify({
+        type: 'task_rejected',
+        from,
+        review,
+        taskContent,
+        userId
       }));
     }
+  }
 
-    if (type === 'clear') {
-      const userId = 'boss';
-      await clearHistory(userId);
-      ws.send(JSON.stringify({
-        type: 'clear',
-        success: true,
+  // 更新状态为 idle
+  await setAgentStatus(from, {
+    status: 'idle',
+    currentTask: null,
+    queueLength: await getQueueLength(from)
+  });
+
+  // 检查队列
+  await processNextInQueue(from);
+
+  broadcastAgentStatus(from);
+}
+
+/**
+ * 任务完成
+ */
+async function handleTaskComplete(message) {
+  const { from, result, taskContent, userId } = message;
+
+  // 更新状态为 finish
+  await setAgentStatus(from, {
+    status: 'idle',
+    currentTask: null,
+    queueLength: await getQueueLength(from)
+  });
+
+  // 检查队列中是否有等待的任务
+  await processNextInQueue(from);
+
+  // 通知 CEO 任务完成
+  const ceoWs = agents.get('ceo');
+  if (ceoWs && ceoWs.readyState === 1) {
+    ceoWs.send(JSON.stringify({
+      type: 'task_completed',
+      from,
+      result,
+      taskContent,
+      userId
+    }));
+  }
+
+  broadcastAgentStatus(from);
+}
+
+/**
+ * 检查 Agent 是否忙碌
+ */
+async function isAgentBusy(role) {
+  const status = await getAgentStatus(role);
+  return status && status.status === 'processing';
+}
+
+/**
+ * 处理队列中的下一个任务
+ */
+async function processNextInQueue(role) {
+  const nextTask = await popFromQueue(role);
+
+  if (nextTask) {
+    const targetWs = agents.get(role);
+    if (targetWs && targetWs.readyState === 1) {
+      await setAgentStatus(role, {
+        status: 'processing',
+        currentTask: nextTask.taskContent,
+        queueLength: await getQueueLength(role)
+      });
+
+      targetWs.send(JSON.stringify({
+        type: 'new_task',
+        taskContent: nextTask.taskContent,
+        userId: nextTask.userId,
+        flow: nextTask.flow
       }));
-    }
 
-  } catch (error) {
-    console.error('处理消息错误:', error);
-    ws.send(JSON.stringify({
-      type: 'error',
-      content: '处理消息时出错: ' + error.message,
+      logger.info(`从队列取出任务发送给 ${role}，剩余: ${await getQueueLength(role)}`);
+
+      broadcastAgentStatus(role);
+    }
+  } else {
+    // 队列空，更新为 idle
+    await setAgentStatus(role, {
+      status: 'idle',
+      currentTask: null,
+      queueLength: 0
+    });
+
+    broadcastAgentStatus(role);
+  }
+}
+
+/**
+ * 广播 Agent 状态
+ */
+async function broadcastAgentStatus(role) {
+  const status = await getAgentStatus(role);
+  broadcast({
+    type: 'agent_status',
+    data: { [role]: status },
+    timestamp: Date.now()
+  });
+
+  // 发布到频道
+  await publish(KEYS.CHANNEL('agent_updates'), {
+    role,
+    ...status
+  });
+}
+
+/**
+ * 通知任务已入队
+ */
+async function notifyTaskQueued(requestFrom, targetAgent, queueLength) {
+  const fromWs = agents.get(requestFrom);
+  if (fromWs && fromWs.readyState === 1) {
+    fromWs.send(JSON.stringify({
+      type: 'task_queued',
+      to: targetAgent,
+      queueLength,
+      message: `${targetAgent} 忙碌，任务已入队排队`
     }));
   }
 }
 
-// 获取Claude回复 (Messages API)
-async function getClaudeResponse(history, newMessage) {
-  const agentMessages = [];
-
-  // 添加系统提示（CEO的角色设定）
-  agentMessages.push({
-    role: 'system',
-    content: ceoConfig
-  });
-
-  // 添加历史消息
-  for (const msg of history) {
-    // API 只接受 user/assistant/system，将 agent_ceo 转为 assistant
-    let role = msg.role;
-    if (role === 'agent_ceo') role = 'assistant';
-    agentMessages.push({
-      role: role,
-      content: msg.content
-    });
-  }
-
-  // 添加新消息
-  agentMessages.push({
-    role: 'user',
-    content: newMessage
-  });
-
-  console.log('[DEBUG] 模型:', process.env.ANTHROPIC_MODEL);
-  console.log('[DEBUG] API URL:', anthropic.baseURL);
-  console.log('[DEBUG] 发送消息数:', agentMessages.length);
-
-  try {
-    const response = await anthropic.messages.create({
-      model: process.env.ANTHROPIC_MODEL,
-      max_tokens: 4096,
-      messages: agentMessages,
-    });
-
-    console.log('[DEBUG] API响应:', JSON.stringify(response).substring(0, 500));
-
-    // 提取文本内容（兼容MiniMax的thinking类型）
-    let text = '';
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        text = block.text;
-        break;
-      }
+/**
+ * 广播给所有客户端
+ */
+function broadcast(message) {
+  const data = JSON.stringify(message);
+  clients.forEach((ws) => {
+    if (ws.readyState === 1) {
+      ws.send(data);
     }
-
-    return text || '处理中...';
-  } catch (error) {
-    console.error('Claude API错误:', error.message);
-    return '有咩请留言，我阵间复你';
-  }
+  });
 }
 
-// 保存消息到Redis
-async function saveMessage(userId, message) {
-  const key = CHATROOM_KEY + userId;
-  try {
-    await redis.lPush(key, JSON.stringify(message));
-    // 保留最近100条消息
-    await redis.lTrim(key, 0, 99);
-    // 设置24小时过期时间
-    await redis.expire(key, 86400);
-  } catch (err) {
-    console.error('保存消息失败:', err);
-  }
-}
-
-// 获取聊天历史
-async function getChatHistory(userId) {
-  const key = CHATROOM_KEY + userId;
-  try {
-    const messages = await redis.lRange(key, 0, -1);
-    if (!Array.isArray(messages)) {
-      console.log('Redis返回非数组:', messages);
-      return [];
-    }
-    // 按时间戳从旧到新排序
-    const parsed = messages.map(m => JSON.parse(m));
-    return parsed.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  } catch (err) {
-    console.error('获取历史失败:', err);
-    return [];
-  }
-}
-
-// 清除历史
-async function clearHistory(userId) {
-  const key = CHATROOM_KEY + userId;
-  await redis.del(key);
-}
-
-// WebSocket连接处理
-wss.on('connection', (ws) => {
-  console.log('新客户端连接');
-
-  clients.add(ws);
-
-  // 广播新用户上线通知
-  broadcast({
-    type: 'online',
-    name: '包工头',
-    timestamp: new Date().toISOString(),
-  });
-
-  ws.on('message', (message) => {
-    handleMessage(ws, message.toString());
-  });
-
-  ws.on('close', () => {
-    console.log('客户端断开连接');
-    clients.delete(ws);
-  });
-
-  ws.on('error', (error) => {
-    console.error('WebSocket错误:', error);
-    clients.delete(ws);
-  });
+// 错误处理
+process.on('uncaughtException', (err) => {
+  logger.error('未捕获异常', { error: err.message, stack: err.stack });
 });
 
-// 启动服务器
-init().catch(console.error);
+process.on('unhandledRejection', (reason) => {
+  logger.error('未处理的Promise拒绝', { reason });
+});
 
-// 优雅关闭
-process.on('SIGINT', async () => {
-  console.log('\n正在关闭...');
-  await redis.quit();
-  wss.close();
-  process.exit(0);
+main().catch((err) => {
+  logger.error('启动失败', { error: err.message, stack: err.stack });
+  process.exit(1);
 });
