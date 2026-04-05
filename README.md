@@ -14,6 +14,8 @@
 - **多轮对话支持**：支持复杂任务多轮交互，自动执行工具调用、文件读写等操作
 - **强制工作目录**：所有Agent生成的文件统一保存在`workspace/`目录，避免文件散落
 - **一键启停**：提供`start.sh`/`stop.sh`脚本，快速部署管理后台运行的Agent集群
+- **文件管理**：支持图片上传、预览、下载、删除，统一管理workspace目录文件
+- **多端适配**：支持PC端和移动端界面，自适应响应式布局
 
 ## 系统架构
 
@@ -72,7 +74,12 @@ slave-beasts/
 ├── stop.sh                # 一键停止所有后台Agent脚本
 ├── web/
 │   ├── index.html         # 前端页面（聊天室 + 看板 + Agent在线状态）
-│   └── index.js           # 前端逻辑（WS连接、消息渲染、看板刷新）
+│   ├── index.js           # 前端逻辑（WS连接、消息渲染、看板刷新）
+│   ├── mobile.html        # 移动端页面
+│   ├── mobile.js          # 移动端逻辑
+│   ├── common.js          # PC/移动端共用逻辑
+│   ├── files.html         # 文件管理页面（图片预览/下载/删除）
+│   └── files.js           # 文件管理逻辑
 ├── agents/
 │   ├── base.js            # Agent基类：init、processLoop、processTask、CLI启动、会话恢复
 │   ├── ceo.js             # 包工头（CEO）
