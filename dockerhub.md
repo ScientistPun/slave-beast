@@ -15,7 +15,7 @@
 ### 拉取镜像
 
 ```bash
-docker pull [username]/slave-beast:latest
+docker pull scientistpun/slave-beast:latest
 ```
 
 ### 运行容器
@@ -27,7 +27,7 @@ docker run -d \
   -v $(pwd)/workspace:/app/workspace \
   -v $(pwd)/logs:/app/logs \
   --restart unless-stopped \
-  [username]/slave-beast:latest
+  scientistpun/slave-beast:latest
 ```
 
 ## 本地构建并推送
@@ -36,59 +36,10 @@ docker run -d \
 
 ```bash
 # 构建镜像
-docker build -t [username]/slave-beast:latest .
+docker build -t scientistpun/slave-beast:latest .
 
 # 测试运行
-docker run -d -p 3000:3000 --name slave-beast [username]/slave-beast:latest
-```
-
-## 自动构建设置
-
-### Docker Hub Automated Build
-
-1. 登录 [Docker Hub](https://hub.docker.com/)
-2. 创建 repository: `slave-beast`
-3. 关联 GitHub/GitLab 仓库
-4. 设置构建规则:
-   - Branch: `main` → `latest`
-   - Tag: `vx.x.x` → `vx.x.x`
-
-### GitHub Actions 自动构建
-
-创建 `.github/workflows/docker.yml`:
-
-```yaml
-name: Build and Push Docker Image
-
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            [username]/slave-beast:latest
-            [username]/slave-beast:${{ github.ref_name }}
+docker run -d -p 3000:3000 --name slave-beast scientistpun/slave-beast:latest
 ```
 
 ## 数据持久化
@@ -130,10 +81,7 @@ chmod -R 777 workspace/ logs/
 
 ```bash
 # 拉取新版本
-docker pull [username]/slave-beast:latest
-
-# 停止并删除旧容器
-docker stop slave-beast && docker rm slave-beast
+docker pull scientistpun/slave-beast:latest
 
 # 启动新容器
 docker run -d \
@@ -142,5 +90,5 @@ docker run -d \
   -v $(pwd)/workspace:/app/workspace \
   -v $(pwd)/logs:/app/logs \
   --restart unless-stopped \
-  [username]/slave-beast:latest
+  scientistpun/slave-beast:latest
 ```
