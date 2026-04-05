@@ -230,6 +230,8 @@ function sendMessage(content, messageArea) {
     timestamp: Date.now()
   };
 
+  document.getElementById('chatInput').value = '';
+
   ws.send(JSON.stringify(message));
 
   const msgId = message.timestamp + '_' + message.sender;
