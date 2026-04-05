@@ -7,6 +7,10 @@ services:
     container_name: slave-beast
     # 共享宿主机网络，使用宿主机IP
     network_mode: "host"
+    # 端口映射
+    ports:
+      - "3000:3000"   # WebSocket服务端口
+      - "6379:6379"   # Redis端口
     # 保持容器后台运行
     tty: true
     stdin_open: true
