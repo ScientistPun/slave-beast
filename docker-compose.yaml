@@ -16,6 +16,9 @@ services:
     stdin_open: true
     # 环境变量
     environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      # 防止 apt 安装过程中弹出交互式对话框
+      - DEBIAN_FRONTEND=noninteractive
       - TZ=Asia/Shanghai
     # 启动命令
     command: >
