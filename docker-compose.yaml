@@ -13,13 +13,16 @@ services:
     # 环境变量
     environment:
       - TZ=Asia/Shanghai
-      - REDIS_HOST=127.0.0.1
-      - REDIS_PORT=6379
-      - PORT=3000
+    # 启动命令
+    command: >
+      bash -c "
+        /usr/local/bin/start.sh
+        tail -f /dev/null
+      "
     # 重启策略
     restart: unless-stopped
     # 挂载必要目录
     volumes:
-      - ./.claude:/app/.claude
+      - ./claude:/app/.claude
       - ./workspace:/app/workspace
     working_dir: /app

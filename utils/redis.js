@@ -149,10 +149,10 @@ class RedisClient {
 
   /**
    * 获取聊天记录
-   * @param {number} count - 获取数量，默认100
+   * @param {number} count - 获取数量，默认10
    * @returns {Array} - 消息数组
    */
-  async getChatHistory(count = 100) {
+  async getChatHistory(count = 10) {
     try {
       const messages = await this.redis.lrange('slavebeasts:chat:history', 0, count - 1);
       return messages.map(msg => JSON.parse(msg)).reverse();

@@ -14,6 +14,12 @@ const createLogger = require('./utils/logger');
 const PORT = process.env.PORT || 3000;
 const BOARD_PUSH_INTERVAL = 1000; // 每秒推送看板数据
 
+// 文件管理目录（使用 workspace 目录）
+const FILE_DIR = path.join(__dirname, 'workspace');
+if (!fs.existsSync(FILE_DIR)) {
+  fs.mkdirSync(FILE_DIR, { recursive: true });
+}
+
 // 日志
 const logger = createLogger('server');
 
@@ -91,6 +97,151 @@ const httpServer = http.createServer((req, res) => {
   }
 
   let urlPath = req.url.split('?')[0];
+
+  // ==================== 文件管理 API ====================
+
+  // 文件列表
+  if (urlPath === '/files' && req.method === 'GET') {
+    try {
+      const files = [];
+      if (fs.existsSync(FILE_DIR)) {
+        const fileList = fs.readdirSync(FILE_DIR);
+        for (const file of fileList) {
+          const fileFullPath = path.join(FILE_DIR, file);
+          const stat = fs.statSync(fileFullPath);
+          files.push({
+            name: file,
+            size: stat.size,
+            mtime: stat.mtime.getTime()
+          });
+        }
+      }
+      // 按修改时间倒序
+      files.sort((a, b) => b.mtime - a.mtime);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(files));
+    } catch (error) {
+      logger.error('获取文件列表失败:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '获取文件列表失败' }));
+    }
+    return;
+  }
+
+  // 上传文件
+  if (urlPath === '/upload' && req.method === 'POST') {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const buffer = Buffer.concat(chunks);
+        const boundary = req.headers['content-type'].split('; ')[1].replace('boundary=', '');
+        const parts = parseMultipart(buffer, boundary);
+
+        for (const part of parts) {
+          const filename = part.filename;
+          if (filename) {
+            const filePath = path.join(FILE_DIR, filename);
+            fs.writeFileSync(filePath, part.data);
+            logger.info(`文件上传成功: ${filename}`);
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (error) {
+        logger.error('文件上传失败:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '文件上传失败' }));
+      }
+    });
+    return;
+  }
+
+  // 删除文件
+  if (urlPath.startsWith('/files/') && req.method === 'DELETE') {
+    const filename = decodeURIComponent(urlPath.slice(7));
+    const filePath = path.join(FILE_DIR, filename);
+
+    if (!fs.existsSync(filePath)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '文件不存在' }));
+      return;
+    }
+
+    try {
+      fs.unlinkSync(filePath);
+      logger.info(`文件删除成功: ${filename}`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      logger.error('文件删除失败:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '删除失败' }));
+    }
+    return;
+  }
+
+  // 访问上传的文件
+  if (urlPath.startsWith('/workspace/')) {
+    const filename = decodeURIComponent(urlPath.slice(11));
+    const filePath = path.join(FILE_DIR, filename);
+
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filename).toLowerCase();
+      const contentTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.pdf': 'application/pdf'
+      };
+      res.writeHead(200, { 'Content-Type': contentTypes[ext] || 'application/octet-stream' });
+      res.end(fs.readFileSync(filePath));
+    } else {
+      res.writeHead(404);
+      res.end('Not Found');
+    }
+    return;
+  }
+
+  // 解析 multipart form data
+  function parseMultipart(buffer, boundary) {
+    const parts = [];
+    const boundaryBuffer = Buffer.from('--' + boundary);
+    let start = 0;
+
+    while (start < buffer.length) {
+      const idx = buffer.indexOf(boundaryBuffer, start);
+      if (idx === -1) break;
+
+      const nextIdx = buffer.indexOf(boundaryBuffer, idx + boundaryBuffer.length);
+      if (nextIdx === -1) break;
+
+      const chunk = buffer.slice(idx + boundaryBuffer.length + 2, nextIdx - 2);
+      const headerEnd = chunk.indexOf('\r\n\r\n');
+      if (headerEnd === -1) {
+        start = nextIdx;
+        continue;
+      }
+
+      const header = chunk.slice(0, headerEnd).toString();
+      const data = chunk.slice(headerEnd + 4);
+
+      const filenameMatch = header.match(/filename="([^"]+)"/);
+      if (filenameMatch) {
+        parts.push({
+          filename: filenameMatch[1],
+          data: data
+        });
+      }
+
+      start = nextIdx;
+    }
+
+    return parts;
+  }
 
   // 根路径返回 index.html
   if (urlPath === '/') {
@@ -577,7 +728,11 @@ async function handleTaskReject(agentName, data) {
 
 async function handleGetHistory(ws) {
   try {
-    const messages = await redis.getChatHistory(100);
+    const messages = await redis.getChatHistory(10);
+    logger.info('发送历史消息, 数量:', messages ? messages.length : 0);
+    if (messages && messages.length > 0) {
+      logger.info('第一条消息:', JSON.stringify(messages[0]));
+    }
     sendToClient(ws, {
       type: 'history',
       messages: messages || []

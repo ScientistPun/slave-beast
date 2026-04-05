@@ -10,7 +10,9 @@ if (!fs.existsSync(logsDir)) {
 
 // 清空指定 agent 的日志文件
 function clearLog(agentName) {
-  const logFile = path.join(logsDir, `${agentName}.log`);
+  // 移除可能存在的.log后缀，避免重复拼接
+  const cleanName = agentName.endsWith('.log') ? agentName.slice(0, -4) : agentName;
+  const logFile = path.join(logsDir, `${cleanName}.log`);
   if (fs.existsSync(logFile)) {
     // 只清空文件内容，不删除文件（保持文件句柄）
     fs.writeFileSync(logFile, '', 'utf-8');

@@ -11,6 +11,7 @@ const createLogger = require('../utils/logger');
 
 class BaseAgent {
   constructor(agentName, agentRole, workDir = null) {
+    this.location = "广东广州";
     this.agentName = agentName;
     this.agentRole = agentRole;
     this.workDir = workDir || path.join(__dirname, '/../workspace'); // 默认项目目录

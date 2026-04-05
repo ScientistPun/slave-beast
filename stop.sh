@@ -1,27 +1,33 @@
 #!/bin/bash
 
-# 奴隶兽团队一键停止脚本
+# 奴隶兽团队停止脚本
 
-echo "🔍 正在查找所有Agent进程..."
-pids=$(pgrep -f "node.*agent")
+echo "🔍 正在停止服务..."
+
+# 查找进程并发送SIGTERM
+pids=$(ps aux | grep -E "node.*server|node.*agent" | grep -v grep | awk '{print $2}')
 
 if [ -z "$pids" ]; then
-  echo "ℹ️  没有发现正在运行的Agent进程"
+  echo "✅ 没有发现运行中的服务"
   exit 0
 fi
 
-echo "🛑 正在停止以下Agent进程："
-echo "$pids"
+echo "🛑 正在停止进程: $pids"
 
-pkill -f "node.*agent" > /dev/null 2>&1
-sleep 1
+# 优雅停止
+for pid in $pids; do
+  kill -15 $pid 2>/dev/null
+done
 
-# 验证是否停止
-remaining=$(pgrep -f "node.*agent")
-if [ -z "$remaining" ]; then
-  echo "✅ 所有Agent进程已成功停止"
-else
-  echo "⚠️  以下进程未能停止，需要手动kill："
-  echo "$remaining"
-  exit 1
+sleep 2
+
+# 检查是否还在运行
+remaining=$(ps aux | grep -E "node.*server|node.*agent" | grep -v grep | awk '{print $2}')
+if [ -n "$remaining" ]; then
+  echo "⚠️  强制停止剩余进程..."
+  for pid in $remaining; do
+    kill -9 $pid 2>/dev/null
+  done
 fi
+
+echo "✅ 服务已停止"

@@ -89,6 +89,10 @@
       flex-direction: column;
     }
 
+    .chat-header-center {
+      text-align: center;
+    }
+
     .chat-header h1 {
       font-size: 1.35rem;
       font-weight: 600;
@@ -373,6 +377,22 @@
       display: flex;
     }
 
+    .modal-btn {
+      padding: 0.4rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    /* 确认弹窗 */
+    .confirm-modal .modal-content {
+      min-width: 280px;
+    }
+    .confirm-modal .modal-btn.confirm {
+      background: #EF4444 !important;
+      color: white;
+    }
+
     .modal-content {
       background: white;
       border-radius: 16px;
@@ -647,14 +667,39 @@
       .container {
         flex-direction: column;
         padding: 10px;
+        gap: 10px;
+      }
+
+      .chat-section {
+        flex: 1;
+        min-height: 60vh;
       }
 
       .kanban-section {
         width: 100%;
+        flex-shrink: 0;
       }
 
       .message {
         max-width: 80%;
+      }
+
+      .message-bubble {
+        font-size: 0.85rem;
+        padding: 8px 12px;
+      }
+
+      .chat-header h1 {
+        font-size: 1.1rem;
+      }
+
+      .btn-group.inline {
+        flex-wrap: wrap;
+      }
+
+      .history-btn {
+        padding: 10px 14px;
+        font-size: 0.75rem;
       }
     }
 
@@ -795,14 +840,14 @@
     <!-- 左侧聊天区域 -->
     <div class="chat-section">
       <div class="chat-header">
-        <div class="chat-header-left">
-          <h1>奴隶兽团队</h1>
-          <p>多Agent智能任务调度系统</p>
-        </div>
         <div class="connection-status">
           <span class="connection-dot" id="connectionDot"></span>
           <span id="connectionText">连接中...</span>
         </div>
+        <div class="chat-header-center">
+          <h1>奴隶兽团队</h1>
+        </div>
+        <div style="width: 70px;"></div>
       </div>
 
       <div class="chat-messages" id="chatMessages"></div>
@@ -825,6 +870,7 @@
             <button class="history-btn danger" id="clearHistoryBtn">🗑️ 清空聊天</button>
             <button class="history-btn" id="clearAllLogsBtn">🧹 清空所有日志</button>
             <button class="history-btn" id="clearLogBtn">📄 清空指定日志</button>
+            <button class="history-btn" id="fileManagerBtn">📁 文件管理</button>
           </div>
         </div>
         <div class="at-hint">提示：@包工头 @桥王 @天文台 @蛇头 @驴仔 @忍者神龟 可单独分配任务，或使用 @ceo 任务内容 格式</div>
@@ -873,6 +919,7 @@
     </div>
   </div>
 
+  <script src="common.js"></script>
   <script src="index.js"></script>
 </body>
 </html>
