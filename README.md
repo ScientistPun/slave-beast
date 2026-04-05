@@ -93,7 +93,34 @@ slave-beasts/
 
 ## 安装部署
 
-### 环境要求
+### Docker 部署（推荐）
+
+使用 Docker 一键部署，自动安装所有依赖。
+
+```bash
+# 构建并启动（后台运行）
+docker-compose up -d --build
+
+# 查看日志
+docker logs -f slave-beast
+
+# 停止服务
+docker-compose down
+```
+
+容器启动后自动：
+1. 安装 Claude Code + cc-switch
+2. 安装 npm 依赖
+3. 启动 Redis 服务
+4. 启动 WebSocket 服务和所有 Agent 进程
+
+**部署文件说明**：
+- `Dockerfile`：构建镜像，包含 Ubuntu 24.04 + Redis + Node.js + Claude Code
+- `docker-compose.yaml`：容器编排配置，单容器部署
+- `setup.sh`：Claude Code + cc-switch 安装脚本
+- `start.sh`：服务启动脚本
+
+### 本地部署
 
 - **Node.js**: >= 18.0.0
 - **Redis**: 4.0+ (本地或远程可访问)
