@@ -1,0 +1,78 @@
+/**
+ * 天文台 (CRO)
+ * 职责：从队列读取任务，需要 @cro 才接收消息
+ */
+
+const BaseAgent = require('./base');
+
+class CROAgent extends BaseAgent {
+  constructor() {
+    super('cro', '天文台');
+    this.logger.info('天文台已初始化');
+  }
+
+  // ==================== 消息处理 ====================
+
+  onChatMessage(message) {
+    if (this.isMentioned(message)) {
+      this.handleAtMessage(message);
+    }
+  }
+
+  async handleAtMessage(message) {
+    if (message.sender == this.agentRole) return;
+    let content = message.content || '';
+    // 支持 @cro 和 @天文台
+    if (content.indexOf(`@${this.agentRole}`) === -1 || content.indexOf('【POV】') === 0 || !content.trim()) return;
+
+    this.logger.info(`[${this.agentName}]收到任务: ${content}`);
+
+    const redis = require('../utils/redis');
+    const task = {
+      id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      content,
+      from: message.sender || '老细',
+      to: 'cro',
+      timestamp: Date.now(),
+      status: 'pending'
+    };
+
+    await redis.lpush(`slavebeasts:agent:cro:queue`, task);
+    this.logger.info(`任务已入队: ${task.id}`);
+  }
+
+  isMentioned(message) {
+    const content = message.content || '';
+    // 同时支持 @cro 和 @天文台
+    return content.includes('@cro') || content.includes('@天文台');
+  }
+}
+
+// ==================== 独立运行入口 ====================
+
+async function main() {
+  const agent = new CROAgent();
+
+  process.on('SIGTERM', async () => {
+    await agent.shutdown();
+    process.exit(0);
+  });
+
+  process.on('SIGINT', async () => {
+    await agent.shutdown();
+    process.exit(0);
+  });
+
+  try {
+    await agent.init();
+  } catch (err) {
+    agent.logger.error('启动失败:', err);
+    process.exit(1);
+  }
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = CROAgent;

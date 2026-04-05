@@ -16,6 +16,7 @@
       --theme-primary-dark: #4F46E5;
       --theme-primary-light: #818CF8;
 
+      --call-agent: #F59E0B;
       --agent-ceo: #EF4444;
       --agent-cto: #F59E0B;
       --agent-cro: #10B981;
@@ -23,7 +24,10 @@
       --agent-pm: #8B5CF6;
       --agent-qd: #EC4899;
 
-      --status-success: #22C55E;
+      --status-idle: #22C55E;
+      --status-processing: #3B82F6;
+      --status-finish: #6B7280;
+      --status-reject: #EF4444;
       --status-warning: #F59E0B;
       --status-error: #EF4444;
 
@@ -227,6 +231,15 @@
       white-space: pre-wrap;
     }
 
+    /* @指令消息高亮 */
+    .message .content .at-mention {
+      color: var(--call-agent);
+      font-weight: 600;
+      background: rgba(99, 102, 241, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
     /* 时间戳 */
     .message .time {
       font-size: 0.6rem;
@@ -321,9 +334,103 @@
       padding-left: 8px;
     }
 
+    /* 操作面板 */
+    .operation-panel {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-group.inline {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn-group.inline .history-btn {
+      flex: 1;
+      min-width: 80px;
+      justify-content: center;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+    }
+
+    /* 弹窗样式 */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      min-width: 320px;
+      max-width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-content h3 {
+      margin-bottom: 16px;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+    }
+
+    .log-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+    }
+
+    .log-item {
+      padding: 12px 16px;
+      background: var(--bg-input);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .log-item:hover {
+      background: var(--theme-primary);
+      color: white;
+    }
+
+    .log-item .log-name {
+      font-weight: 600;
+    }
+
+    .log-item .log-size {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
     /* 右侧：看板 */
     .kanban-section {
-      width: 380px;
+      width: 420px;
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -349,7 +456,7 @@
     .agent-list {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
 
     .agent-item {
@@ -361,17 +468,19 @@
       border-radius: 14px;
       cursor: pointer;
       transition: all 0.2s;
+      border: 2px solid transparent;
     }
 
     .agent-item:hover {
       background: white;
       box-shadow: 0 2px 12px rgba(99, 102, 241, 0.15);
+      border-color: var(--theme-primary-light);
     }
 
     /* Agent 头像 */
     .agent-avatar {
-      width: 44px;
-      height: 44px;
+      width: 48px;
+      height: 48px;
       border-radius: 12px;
       object-fit: cover;
       flex-shrink: 0;
@@ -399,8 +508,8 @@
 
     .agent-name {
       font-weight: 600;
-      font-size: 0.9rem;
-      margin-bottom: 2px;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
       color: var(--text-primary);
     }
 
@@ -410,13 +519,46 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+
+    /* 进度条 */
+    .progress-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--theme-primary) 0%, var(--theme-primary-light) 100%);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-bar.idle {
+      background: var(--status-idle);
+    }
+
+    .progress-bar.processing {
+      background: linear-gradient(90deg, var(--status-processing) 0%, #60A5FA 100%);
+    }
+
+    .progress-bar.finish {
+      background: var(--status-finish);
+    }
+
+    .progress-bar.reject {
+      background: var(--status-reject);
     }
 
     .agent-status {
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 4px;
+      gap: 6px;
     }
 
     .status-badge {
@@ -429,33 +571,33 @@
 
     .status-badge.idle {
       background: rgba(34, 197, 94, 0.15);
-      color: #16A34A;
+      color: var(--status-idle);
     }
 
     .status-badge.processing,
     .status-badge.busy {
-      background: rgba(245, 158, 11, 0.15);
-      color: #D97706;
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--status-processing);
     }
 
     .status-badge.finish {
-      background: rgba(34, 197, 94, 0.15);
-      color: #16A34A;
+      background: rgba(107, 114, 128, 0.15);
+      color: var(--status-finish);
     }
 
     .status-badge.reject {
       background: rgba(239, 68, 68, 0.15);
-      color: #DC2626;
+      color: var(--status-reject);
     }
 
     .status-badge.error {
       background: rgba(239, 68, 68, 0.15);
-      color: #DC2626;
+      color: var(--status-error);
     }
 
     .status-badge.queued {
-      background: rgba(59, 130, 246, 0.15);
-      color: #2563EB;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--status-warning);
     }
 
     .queue-count {
@@ -529,6 +671,123 @@
       background: var(--border);
       border-radius: 3px;
     }
+
+    /* Loading 动画 */
+    .loading-row {
+      justify-content: flex-start;
+    }
+
+    .loading-message {
+      background: var(--bg-secondary);
+      padding: 12px 16px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+    }
+
+    .loading-dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .loading-dots span {
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .loading-dots span:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    .loading-dots span:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+
+    @keyframes bounce {
+      0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.5;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* 正在输入中气泡 */
+    .typing-row {
+      animation: fadeIn 0.2s ease;
+    }
+
+    .typing-bubble {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+    }
+
+    .typing-text {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      animation: textPulse 2s infinite ease-in-out;
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .typing-dots span {
+      width: 6px;
+      height: 6px;
+      background: var(--theme-primary);
+      border-radius: 50%;
+      animation: typingPulse 1.4s infinite ease-in-out both;
+    }
+
+    .typing-dots span:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    .typing-dots span:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+
+    @keyframes typingPulse {
+      0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    @keyframes textPulse {
+      0%, 100% {
+        opacity: 0.6;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
   </style>
 </head>
 <body>
@@ -559,22 +818,56 @@
           >
           <button class="send-btn" id="sendBtn">➤</button>
         </div>
-        <div class="at-hint">提示：@包工头 @桥王 @天文台 @蛇头 @驴仔 @忍者神龟 可单独分配任务</div>
+        <!-- 操作面板放在输入框下方 -->
+        <div class="operation-panel">
+          <div class="btn-group inline">
+            <button class="history-btn" id="loadHistoryBtn">📜 加载历史</button>
+            <button class="history-btn danger" id="clearHistoryBtn">🗑️ 清空聊天</button>
+            <button class="history-btn" id="clearAllLogsBtn">🧹 清空所有日志</button>
+            <button class="history-btn" id="clearLogBtn">📄 清空指定日志</button>
+          </div>
+        </div>
+        <div class="at-hint">提示：@包工头 @桥王 @天文台 @蛇头 @驴仔 @忍者神龟 可单独分配任务，或使用 @ceo 任务内容 格式</div>
       </div>
     </div>
 
     <!-- 右侧看板区域 -->
     <div class="kanban-section">
       <div class="kanban-card">
-        <h2>Agent 状态</h2>
+        <h2>Agent 状态看板</h2>
         <div class="agent-list" id="agentList"></div>
       </div>
 
       <div class="kanban-card">
-        <h2>操作</h2>
-        <div class="btn-group">
-          <button class="history-btn" id="loadHistoryBtn">📜 加载历史记录</button>
-          <button class="history-btn danger" id="clearHistoryBtn">🗑️ 清空聊天记录</button>
+        <h2>状态说明</h2>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem; color: var(--text-secondary);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="status-badge idle" style="font-size: 0.6rem;">空闲</span>
+            <span>Agent处于空闲状态，可接收任务</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="status-badge processing" style="font-size: 0.6rem;">执行中</span>
+            <span>Agent正在执行任务</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="status-badge finish" style="font-size: 0.6rem;">已完成</span>
+            <span>Agent已完成任务</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="status-badge reject" style="font-size: 0.6rem;">已驳回</span>
+            <span>Agent已驳回任务</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 日志选择弹窗 -->
+    <div class="modal-overlay" id="logModal">
+      <div class="modal-content">
+        <h3>选择要清空的日志</h3>
+        <div class="log-list" id="logList"></div>
+        <div class="modal-buttons">
+          <button class="history-btn" id="cancelLogBtn">取消</button>
         </div>
       </div>
     </div>
