@@ -5,8 +5,6 @@ services:
   slave-beast:
     build: .
     container_name: slave-beast
-    # 共享宿主机网络，使用宿主机IP
-    network_mode: "host"
     # 端口映射
     ports:
       - "3000:3000"   # WebSocket服务端口
@@ -20,16 +18,13 @@ services:
       # 防止 apt 安装过程中弹出交互式对话框
       - DEBIAN_FRONTEND=noninteractive
       - TZ=Asia/Shanghai
-    # 启动命令
-    command: >
-      bash -c "
-        /usr/local/bin/start.sh
-        tail -f /dev/null
-      "
+    # 启动命令 - 直接运行 start.sh，让它作为 PID 1
+    command: tail -f /dev/null
     # 重启策略
     restart: unless-stopped
     # 挂载必要目录
     volumes:
       - ./claude:/app/.claude
+      - ./logs:/app/logs
       - ./workspace:/app/workspace
     working_dir: /app
