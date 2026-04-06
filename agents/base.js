@@ -277,12 +277,20 @@ class BaseAgent {
         args.push('--agent', this.agentName)
       }
 
-      this.logger.info(`[${this.agentName}] 启动 CLI: claude ${args.join(' ')}`);
-      // this.logger.info(`[${this.agentName}] 启动 CLI 并发送: ${msgContent}, 类型: ${typeof msgContent}`);
+      // 获取 claude 完整路径
+      let claudePath = 'claude';
+      try {
+        claudePath = require('child_process').execSync('which claude', { encoding: 'utf-8' }).trim() || 'claude';
+      } catch (e) {
+        this.logger.warn(`[${this.agentName}] 找不到 claude，使用默认路径`);
+      }
 
-      this.cliProcess = spawn('claude', args, {
+      this.logger.info(`[${this.agentName}] 启动 CLI: ${claudePath} ${args.join(' ')}`);
+
+      this.cliProcess = spawn(claudePath, args, {
         cwd: this.workDir,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, PATH: `${process.env.HOME}/.local/bin:${process.env.PATH}` }
       });
 
       const cliProcess = this.cliProcess;

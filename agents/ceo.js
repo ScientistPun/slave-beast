@@ -14,16 +14,20 @@ class CEOAgent extends BaseAgent {
 
   // ==================== 消息处理 ====================
 
-  onChatMessage(message) {
+  async onChatMessage(message) {
     if (message.sender == this.agentRole) return;
     let content = message.content || '';
-    
+
     // 支持 @包工头
     if (content.indexOf(`@${this.agentRole}`) === -1 || content.indexOf('【POV】') === 0 || !content.trim()) return;
 
     this.logger.info(`[${this.agentName}]收到[${message.sender}]消息: ${content}`);
-    const sessionId = this.sendMessageToCLI({ content, from: message.sender || '老细' });
-    this.saveSessionId(sessionId);
+    try {
+      const sessionId = await this.sendMessageToCLI({ content, from: message.sender || '老细' });
+      this.saveSessionId(sessionId);
+    } catch (err) {
+      this.logger.error(`[${this.agentName}]消息处理失败:`, err);
+    }
   }
 }
 

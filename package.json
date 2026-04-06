@@ -1,6 +1,6 @@
 {
   "name": "slave-beasts",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "type": "commonjs",
   "description": "奴隶兽多Agent调度系统 - 基于Redis + WebSocket + Claude Agent SDK",
   "main": "server.js",

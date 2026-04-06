@@ -5,20 +5,26 @@
 echo "🔍 正在停止现有进程..."
 pkill -f "node.*agent" > /dev/null 2>&1
 pkill -f "node.*server" > /dev/null 2>&1
-sleep 1
+sleep 10
 
 echo "🚀 启动 Redis 服务..."
 service redis-server start || redis-server --daemonize yes
-sleep 1
+sleep 3
 
 mkdir -p logs
 
 echo "🚀 正在启动Server..."
 nohup node server.js > logs/server.log 2>&1 &
-sleep 2
+sleep 10
 
 echo "🚀 正在启动所有Agent..."
-nohup node agent-startup.js all > logs/agents.log 2>&1 &
+node agent-startup.js coo > /dev/null 2>&1 &
+node agent-startup.js cro > /dev/null 2>&1 &
+node agent-startup.js cto > /dev/null 2>&1 &
+node agent-startup.js pm > /dev/null 2>&1 &
+node agent-startup.js qd > /dev/null 2>&1 &
+sleep 3
+node agent-startup.js ceo > /dev/null 2>&1 &
 
 echo ""
 echo "✅ 启动完成！"
