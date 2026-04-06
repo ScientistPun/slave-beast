@@ -18,13 +18,16 @@ services:
       # 防止 apt 安装过程中弹出交互式对话框
       - DEBIAN_FRONTEND=noninteractive
       - TZ=Asia/Shanghai
+      # Agent 配置
+      - LOCATION=广东广州
+      - THINK_MODE=false
     # 启动命令 - 直接运行 start.sh，让它作为 PID 1
     command: tail -f /dev/null
     # 重启策略
     restart: unless-stopped
     # 挂载必要目录
     volumes:
-      - ./claude:/app/.claude
       - ./logs:/app/logs
+      - ./web:/app/web
       - ./workspace:/app/workspace
     working_dir: /app

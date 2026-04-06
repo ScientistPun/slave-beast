@@ -17,6 +17,10 @@ bash /tmp/claude-install.sh
 echo "⬇️ 安装 cc-switch..."
 curl -fsSL https://github.com/SaladDay/cc-switch-cli/releases/latest/download/install.sh | bash
 
+# ---------- 2.5 安装 uv (Python 包管理器) ----------
+echo "⬇️ 安装 uv..."
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # ---------- 3. 配置 PATH 环境变量 ----------
 echo "🔧 配置环境变量 PATH..."
 
@@ -40,9 +44,20 @@ echo "✅ 验证工具是否安装成功..."
 
 which claude >/dev/null && echo "✔ Claude Code: $(claude -v 2>/dev/null || echo '版本信息获取异常')" || echo "❌ claude 未找到"
 which cc-switch >/dev/null && echo "✔ cc-switch: $(cc-switch --version 2>/dev/null || echo '版本信息获取异常')" || echo "❌ cc-switch 未找到"
+which uv >/dev/null && echo "✔ uv: $(uv --version 2>/dev/null || echo '版本信息获取异常')" || echo "❌ uv 未找到"
 
-echo "🎉 Claude + cc-switch 安装完成！"
+echo "🎉 Claude + cc-switch + uv 安装完成！"
 
-# ---------- 5. 启动 Redis ----------
+# ---------- 5. 移动 claude ----------
+echo "📦 移动 claude..."
+if [ -f "/app/claude" ]; then
+  echo "覆盖 .claude"
+  mv /app/claude /app/.claude
+  echo "✔ claude 已移动到 .claude"
+else
+  echo "⚠️ 未找到 claude 跳过"
+fi
+
+# ---------- 6. 启动 Redis ----------
 echo "🚀 启动 Redis 服务..."
 service redis-server start

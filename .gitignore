@@ -6,3 +6,4 @@ node_modules/
 workspace/
 logs/
 package-lock.json
+.claude

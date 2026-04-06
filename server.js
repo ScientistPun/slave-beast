@@ -70,6 +70,10 @@ AGENTS.forEach(agent => {
 // 心跳超时阈值（毫秒），超过此时间没收到心跳视为离线
 const HEARTBEAT_TIMEOUT = 60000;
 
+// 定时器引用（用于清理）
+let boardPushInterval = null;
+let heartbeatCheckInterval = null;
+
 // ==================== HTTP 服务器（提供前端页面）====================
 
 const mimeTypes = {
@@ -789,7 +793,7 @@ async function updateAgentOnlineStatusInRedis(agentName, online) {
 // ==================== 看板推送 ====================
 
 // 每秒推送看板数据
-setInterval(async () => {
+boardPushInterval = setInterval(async () => {
   await pushBoardData();
 }, BOARD_PUSH_INTERVAL);
 
@@ -871,7 +875,7 @@ function sendToAgent(agentName, message) {
 
 // ==================== 定时检查 Agent 在线状态（心跳超时检测）====================
 
-setInterval(async () => {
+heartbeatCheckInterval = setInterval(async () => {
   try {
     const now = Date.now();
     let changed = false;
@@ -916,8 +920,16 @@ httpServer.listen(PORT, () => {
 
 // ==================== 优雅关闭 ====================
 
+function cleanup() {
+  logger.info('正在清理定时器...');
+  if (boardPushInterval) clearInterval(boardPushInterval);
+  if (heartbeatCheckInterval) clearInterval(heartbeatCheckInterval);
+  logger.info('定时器已清理');
+}
+
 process.on('SIGTERM', async () => {
   logger.info('收到 SIGTERM，开始关闭服务器...');
+  cleanup();
   wss.close(() => {
     httpServer.close(() => {
       logger.info('服务器已关闭');
@@ -928,6 +940,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   logger.info('收到 SIGINT，开始关闭服务器...');
+  cleanup();
   wss.close(() => {
     httpServer.close(() => {
       logger.info('服务器已关闭');

@@ -3,6 +3,10 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Shanghai
 
+# Agent 配置
+ENV LOCATION=广东广州
+ENV THINK_MODE=false
+
 # 安装基础依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \

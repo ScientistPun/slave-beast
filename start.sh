@@ -18,7 +18,7 @@ nohup node server.js > logs/server.log 2>&1 &
 sleep 2
 
 echo "🚀 正在启动所有Agent..."
-nohup node agent-startup.js all > /dev/null 2>&1 &
+nohup node agent-startup.js all > logs/agents.log 2>&1 &
 
 echo ""
 echo "✅ 启动完成！"

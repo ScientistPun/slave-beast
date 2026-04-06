@@ -11,9 +11,10 @@ const createLogger = require('../utils/logger');
 
 class BaseAgent {
   constructor(agentName, agentRole, workDir = null) {
-    this.location = "广东广州";
+    this.location = process.env.LOCATION || "广东广州";
     this.agentName = agentName;
     this.agentRole = agentRole;
+    this.thinkMode = String(process.env.THINK_MODE).toLowerCase() === 'true' || false;
     this.workDir = workDir || path.join(__dirname, '/../workspace'); // 默认项目目录
 
     this.busy = false;
@@ -27,6 +28,8 @@ class BaseAgent {
     this.connected = false;
     this.reconnectAttempts = 0;
     this.MAX_RECONNECT = 30;
+
+    this.cliProcess = null; // 当前 CLI 进程引用
 
     this.logger = createLogger(agentName);
     this.logger.info(`Agent "${agentName}" (${agentRole}) 初始化，工作目录: ${this.workDir}`);
@@ -194,6 +197,9 @@ class BaseAgent {
     } catch (err) {
       this.logger.error(`[${this.agentName}] 任务执行失败:`, err);
       this.status = 'reject';
+    } finally {
+      // 确保 cliProcess 被清理
+      this.cleanupCLIProcess();
     }
 
     this.progress = 100;
@@ -274,11 +280,12 @@ class BaseAgent {
       this.logger.info(`[${this.agentName}] 启动 CLI: claude ${args.join(' ')}`);
       // this.logger.info(`[${this.agentName}] 启动 CLI 并发送: ${msgContent}, 类型: ${typeof msgContent}`);
 
-      const cliProcess = spawn('claude', args, {
+      this.cliProcess = spawn('claude', args, {
         cwd: this.workDir,
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
+      const cliProcess = this.cliProcess;
       let newSessionId = null;
       let resultCount = 0;
       let errorOutput = '';
@@ -306,9 +313,9 @@ class BaseAgent {
                   // 实时发送到聊天室
                   this.sendChat(item.text);
                 } 
-                /* if (item.type == 'thinking') {
+                if (this.thinkMode && item.type == 'thinking') {
                   this.sendChat('【POV】' + item.thinking);
-                } */
+                }
               }
             }
 
@@ -384,6 +391,28 @@ class BaseAgent {
       await redis.set(`slavebeasts:agent:${this.agentName}:status`, status);
     }
     this.send({ type: 'progress_update', data: { progress, ...extraData } });
+  }
+
+  // ==================== 进程清理 ====================
+
+  cleanupCLIProcess() {
+    if (this.cliProcess) {
+      try {
+        this.cliProcess.kill('SIGTERM');
+        setTimeout(() => {
+          if (this.cliProcess) {
+            try {
+              this.cliProcess.kill('SIGKILL');
+            } catch (e) {
+              // 进程已退出
+            }
+          }
+        }, 1000);
+      } catch (e) {
+        // 进程已退出，忽略
+      }
+      this.cliProcess = null;
+    }
   }
 
   // ==================== 心跳 ====================
