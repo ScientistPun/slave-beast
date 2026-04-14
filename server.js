@@ -755,12 +755,6 @@ async function handleClearHistory() {
     // 清空聊天记录
     await redis.redis.del('slavebeasts:chat:history');
 
-    // 清空所有 Agent 的 session（会触发重新创建会话）
-    const agents = ['ceo', 'cto', 'cro', 'coo', 'pm', 'qd'];
-    for (const agent of agents) {
-      await redis.redis.del(`slavebeasts:agent:${agent}:session`);
-    }
-
     broadcast({
       type: 'history_cleared',
       timestamp: Date.now()

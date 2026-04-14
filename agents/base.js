@@ -41,31 +41,9 @@ class BaseAgent {
     this.logger.info(`[${this.agentName}]开始初始化...`);
     await this.connectWebSocket();
     await this.loadPrompt();
-    await this.initSessionId();
     this.startHeartbeat();
     this.startProcessLoop();
     this.logger.info(`[${this.agentName}]初始化完成`);
-  }
-
-  async initSessionId() {
-    const redis = require('../utils/redis');
-    // 每次初始化时清空旧 session，用新会话（确保格式不会跑偏）
-    await redis.redis.del(`slavebeasts:agent:${this.agentName}:session`);
-    this.sessionId = null;
-    this.logger.info(`[${this.agentName}]已清空旧 session，每次启动用新会话`);
-  }
-
-  async getSessionId() {
-    const redis = require('../utils/redis');
-    return await redis.get(`slavebeasts:agent:${this.agentName}:session`);
-  }
-
-  async saveSessionId(sessionId) {
-    const redis = require('../utils/redis');
-    if (!sessionId) return ;
-    this.sessionId = sessionId;
-    await redis.set(`slavebeasts:agent:${this.agentName}:session`, sessionId);
-    this.logger.info(`[${this.agentName}]保存 session: ${sessionId}`);
   }
 
   // ==================== WebSocket 连接 ====================
@@ -190,8 +168,7 @@ class BaseAgent {
       const task = await this.dequeueTask();
       if (task) {
         const taskObj = typeof task === 'string' ? JSON.parse(task) : task;
-        const sessionId = await this.sendMessageToCLI(taskObj);
-        this.saveSessionId(sessionId);
+        await this.sendMessageToCLI(taskObj);
         this.logger.info(`[${this.agentName}] 任务完成`);
       }
     } catch (err) {
@@ -245,9 +222,6 @@ class BaseAgent {
    * 发送消息给 Claude CLI，返回响应文本
    */
   async sendMessageToCLI(message) {
-    // 先获取 sessionid（在 Promise 外部）
-    const currentSessionId = await this.getSessionId();
-
     return new Promise((resolve, reject) => {
       const msgContent = typeof message === 'string' ? message : message.content;
       if (!msgContent || !msgContent.trim()) {
@@ -261,14 +235,10 @@ class BaseAgent {
         '--output-format', 'stream-json',
         // '--max-turns', "3",
         // '--dangerously-skip-permissions',
+        '--allowedTools', "Read,Glob,Grep,WebSearch,Edit,Write,Bash",
         "--append-system-prompt", `你所在地区是${this.location}`,
         '--verbose'
       ];
-
-      // 带上 sessionid 恢复会话
-      if (currentSessionId) {
-        args.push('--resume', currentSessionId);
-      }
 
       // 带上 prompt
       if (this.prompt) {
@@ -294,7 +264,6 @@ class BaseAgent {
       });
 
       const cliProcess = this.cliProcess;
-      let newSessionId = null;
       let resultCount = 0;
       let errorOutput = '';
                                                                                                                                                                                                  
@@ -329,10 +298,6 @@ class BaseAgent {
 
             // 退出
             if (parsed.type == 'result') {
-              // 保存 session（Claude CLI 返回 session_id）
-              if (parsed.session_id) {
-                newSessionId = parsed.session_id;
-              }                                                                                                                                                                                                                                          
               if (parsed.is_error == true) {                                                                                                                                                                                                             
                 errorOutput = line.trim();                                                                                                                                                                                                               
                 this.logger.info(`[${this.agentName}] CLI 出错退出`);                                                                                                                                                                                    
@@ -355,7 +320,7 @@ class BaseAgent {
 
       cliProcess.on('close', (code) => {
         if (code === 0) {
-          resolve(newSessionId);
+          resolve();
         } else {
           this.logger.error(`CLI 异常退出: code=${code}, stderr=${errorOutput}`);
           reject(new Error(`CLI exited with code ${code}`));

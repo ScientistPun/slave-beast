@@ -23,8 +23,7 @@ class CEOAgent extends BaseAgent {
 
     this.logger.info(`[${this.agentName}]收到[${message.sender}]消息: ${content}`);
     try {
-      const sessionId = await this.sendMessageToCLI({ content, from: message.sender || '老细' });
-      this.saveSessionId(sessionId);
+      await this.sendMessageToCLI({ content, from: message.sender || '老细' });
     } catch (err) {
       this.logger.error(`[${this.agentName}]消息处理失败:`, err);
     }
